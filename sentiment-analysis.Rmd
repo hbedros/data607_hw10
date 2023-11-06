@@ -389,3 +389,188 @@ These are the chapters with the most sad words in each book, normalized for numb
 
 Sentiment analysis provides a way to understand the attitudes and opinions expressed in texts. In this chapter, we explored how to approach sentiment analysis using tidy data principles; when text data is in a tidy data structure, sentiment analysis can be implemented as an inner join. We can use sentiment analysis to understand how a narrative arc changes throughout its course or what words with emotional and opinion content are important for a particular text. We will continue to develop our toolbox for applying sentiment analysis to different kinds of text in our case studies later in this book.
 
+## HBE's extension
+## title: "Sentiment Analysis using SentiWordNet"
+Loading the txt file from:
+Title: The Young Castellan: A Tale of the English Civil War
+Author: George Manville Fenn
+
+```{r}
+library(tidyverse)
+library(tidytext)
+
+gmf_data <- read_lines("https://raw.githubusercontent.com/hbedros/data607_hw10/main/gmf.txt")
+
+gmf_data_tibble <- tibble(text = gmf_data)
+
+tidy_gmf <- gmf_data_tibble %>%
+  group_by(book = "gmf") %>%
+  mutate(
+    linenumber = row_number(),
+    chapter = cumsum(str_detect(text, 
+                                regex("^chapter [\\divxlc]", 
+                                      ignore_case = TRUE)))) %>%
+  ungroup() %>%
+  unnest_tokens(word, text)
+```
+
+## Introduction
+
+In this analysis, we'll be using SentiWordNet to assess the sentiment of the text in our corpus. SentiWordNet provides sentiment scores for synsets in WordNet, allowing us to determine the positivity or negativity of words in our text.
+
+## Data Preparation
+
+First, let's load the necessary libraries and the data:
+
+```{r}
+library(tidyverse)
+library(tokenizers)
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+# Load the corpus
+corpus_url <- "https://raw.githubusercontent.com/hbedros/data607_hw10/main/gmf.txt"
+corpus <- read_lines(corpus_url)
+
+# Load SentiWordNet data (assuming you've already loaded it into an object called 'sentiwordnet')
+sentiwordnet <- read.delim("data/SentiWordNet_3.0.0.txt", header=TRUE)
+
+cleaned_sentiwordnet <- sentiwordnet %>%
+  select(PosScore, NegScore, SynsetTerms) %>%               # Retain the needed columns
+  separate_rows(SynsetTerms, sep = " ") %>%                # Split SynsetTerms on spaces
+  mutate(SynsetTerms = str_remove(SynsetTerms, "#\\d+$"))  # Remove # and numbers
+
+head(cleaned_sentiwordnet)
+```
+
+## Tokenization and Matching with SentiWordNet
+
+Next, we tokenize the corpus and match the tokens with the synsets in SentiWordNet:
+
+```{r}
+# Tokenizing the corpus
+tokens <- unlist(tokenize_words(corpus))
+
+# Splitting the cleaned_sentiwordnet column and matching with tokens
+matched_tokens <- cleaned_sentiwordnet %>%
+  mutate(SynsetTerms = str_split(SynsetTerms, " ")) %>%
+  unnest(c(SynsetTerms)) %>%
+  filter(SynsetTerms %in% tokens)
+```
+
+## Sentiment Scoring
+
+Now, we can calculate the sentiment scores for our tokens:
+
+```{r}
+# Calculate sentiment scores
+sentiment_scores <- matched_tokens %>%
+  group_by(SynsetTerms) %>%
+  summarise(
+    AveragePosScore = mean(as.numeric(PosScore), na.rm = TRUE),
+    AverageNegScore = mean(as.numeric(NegScore), na.rm = TRUE)
+  ) %>%
+  mutate(NetSentiment = AveragePosScore - AverageNegScore)
+```
+
+## Visualization
+
+Finally, let's visualize the top positive and negative words based on their net sentiment scores:
+
+```{r}
+# Top positive and negative words
+top_words <- sentiment_scores %>%
+  arrange(desc(NetSentiment)) %>%
+  head(10)
+
+bottom_words <- sentiment_scores %>%
+  arrange(NetSentiment) %>%
+  head(10)
+
+# Plot
+ggplot(rbind(top_words, bottom_words), aes(x = reorder(SynsetTerms, NetSentiment), y = NetSentiment, fill = NetSentiment > 0)) +
+  geom_col() +
+  coord_flip() +
+  labs(title = "Top Positive and Negative Words based on Net Sentiment Score", x = "Words", y = "Net Sentiment Score") +
+  scale_fill_manual(values = c("red", "green"), name = "Sentiment", labels = c("Negative", "Positive"))
+```
+
+## Conclusion
+
+From the visualization, we can identify the most positive and negative words in our corpus based on their sentiment scores from SentiWordNet.
+
+
+## Another analysis:
+MPQA Subjectivity Lexicon
+
+```{r}
+# Read the file
+subj_lines <- readLines("data/subjclueslen1-HLTEMNLP05.tff")
+
+# Parse the key-value pairs
+parsed_data <- lapply(subj_lines, function(line) {
+  pairs <- strsplit(line, " ")[[1]]
+  sapply(pairs, function(pair) {
+    strsplit(pair, "=")[[1]][2]
+  })
+})
+
+# Convert list to dataframe
+subj_clues <- do.call(rbind.data.frame, parsed_data)
+names(subj_clues) <- sapply(strsplit(subj_lines[1], " "), function(x) strsplit(x, "=")[[1]][1])
+
+# Select relevant columns
+subj_clues <- subj_clues[, c(1, 2, 3, 4, 6)]
+
+# Rename columns
+colnames(subj_clues) <- c("type", "length", "word", "POS", "priorpolarity")
+
+head(subj_clues)
+```
+
+## Data Preparation
+match the tokens with the subj_clues lexicon:
+```{r}
+matched_tokens2 <- subj_clues %>%
+  filter(word %in% tokens)
+```
+
+## Sentiment Scoring
+We'll assign a simple score: +1 for positive words, -1 for negative words, and 0 for neutral/both.
+
+```{r}
+sentiment_scores <- matched_tokens2 %>%
+  mutate(score = case_when(
+    priorpolarity == "positive" ~ 1,
+    priorpolarity == "negative" ~ -1,
+    TRUE ~ 0
+  ))
+
+overall_sentiment_score <- sum(sentiment_scores$score)
+```
+
+## Summary
+```{r}
+paste("The overall sentiment score of the corpus is:", overall_sentiment_score)
+```
+
+## Visualization
+```{r}
+# Create a sentiment label based on priorpolarity
+matched_tokens2$label <- case_when(
+  matched_tokens2$priorpolarity == "positive" ~ "Positive",
+  matched_tokens2$priorpolarity == "negative" ~ "Negative",
+  TRUE ~ "Neutral"
+)
+
+# Plot using ggplot2
+plot <- ggplot(matched_tokens2, aes(x = label)) +
+  geom_bar(fill = c("green", "red", "gray"), width = 0.5) +
+  labs(title = "Sentiment Distribution in the Corpus",
+       x = "Sentiment",
+       y = "Count of Words") +
+  theme_minimal()
+
+print(plot)
+```
