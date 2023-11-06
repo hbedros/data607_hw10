@@ -10,7 +10,7 @@ In our analysis, we utilized methods based on the approaches found in the tidy-t
 
 In the previous chapter, we explored in depth what we mean by the tidy text format and showed how this format can be used to approach questions about word frequency. This allowed us to analyze which words are used most frequently in documents and to compare documents, but now let's investigate a different topic. Let's address the topic of opinion mining or sentiment analysis. When human readers approach a text, we use our understanding of the emotional intent of words to infer whether a section of text is positive or negative, or perhaps characterized by some other more nuanced emotion like surprise or disgust. We can use the tools of text mining to approach the emotional content of text programmatically, as shown in Figure \@ref(fig:tidyflow-ch2).
 
-```{r tidyflow-ch2, echo = FALSE, out.width = '100%', fig.cap = "A flowchart of a typical text analysis that uses tidytext for sentiment analysis. This chapter shows how to implement sentiment analysis using tidy data principles."}
+```{r tidyflow-ch2, include = FALSE, echo = FALSE, out.width = '100%', fig.cap = "A flowchart of a typical text analysis that uses tidytext for sentiment analysis. This chapter shows how to implement sentiment analysis using tidy data principles."}
 knitr::include_graphics("images/tmwr_0201.png")
 ```
 
@@ -389,12 +389,12 @@ These are the chapters with the most sad words in each book, normalized for numb
 
 Sentiment analysis provides a way to understand the attitudes and opinions expressed in texts. In this chapter, we explored how to approach sentiment analysis using tidy data principles; when text data is in a tidy data structure, sentiment analysis can be implemented as an inner join. We can use sentiment analysis to understand how a narrative arc changes throughout its course or what words with emotional and opinion content are important for a particular text. We will continue to develop our toolbox for applying sentiment analysis to different kinds of text in our case studies later in this book.
 
-## HBE's extension
-## title: "Sentiment Analysis using SentiWordNet"
-Loading the txt file from:
-Title: The Young Castellan: A Tale of the English Civil War
-Author: George Manville Fenn
+# Haig Bedros' extension:
 
+## title: "Sentiment Analysis using SentiWordNet"
+
+### Loading the Data:
+Here, we're loading the text file `"The Young Castellan: A Tale of the English Civil War"` by `George Manville Fenn`. The data will be read into a tibble and tokenized for analysis.
 ```{r}
 library(tidyverse)
 library(tidytext)
@@ -414,13 +414,13 @@ tidy_gmf <- gmf_data_tibble %>%
   unnest_tokens(word, text)
 ```
 
-## Introduction
+### Introduction
 
 In this analysis, we'll be using SentiWordNet to assess the sentiment of the text in our corpus. SentiWordNet provides sentiment scores for synsets in WordNet, allowing us to determine the positivity or negativity of words in our text.
 
-## Data Preparation
+### Data Preparation
 
-First, let's load the necessary libraries and the data:
+The SentiWordNet data is also cleaned by retaining essential columns and splitting the terms.
 
 ```{r}
 library(tidyverse)
@@ -444,9 +444,9 @@ cleaned_sentiwordnet <- sentiwordnet %>%
 head(cleaned_sentiwordnet)
 ```
 
-## Tokenization and Matching with SentiWordNet
+### Tokenization and Matching with SentiWordNet
 
-Next, we tokenize the corpus and match the tokens with the synsets in SentiWordNet:
+The text corpus is tokenized, and the resulting tokens are matched with the synsets available in the cleaned SentiWordNet data.
 
 ```{r}
 # Tokenizing the corpus
@@ -459,9 +459,8 @@ matched_tokens <- cleaned_sentiwordnet %>%
   filter(SynsetTerms %in% tokens)
 ```
 
-## Sentiment Scoring
-
-Now, we can calculate the sentiment scores for our tokens:
+### Sentiment Scoring
+For each token, sentiment scores are calculated by averaging the positive and negative scores from SentiWordNet. The net sentiment is the difference between the average positive and negative scores.
 
 ```{r}
 # Calculate sentiment scores
@@ -474,9 +473,8 @@ sentiment_scores <- matched_tokens %>%
   mutate(NetSentiment = AveragePosScore - AverageNegScore)
 ```
 
-## Visualization
-
-Finally, let's visualize the top positive and negative words based on their net sentiment scores:
+### Visualization
+A visualization to showcase the top positive and negative words based on their net sentiment scores.
 
 ```{r}
 # Top positive and negative words
@@ -496,15 +494,16 @@ ggplot(rbind(top_words, bottom_words), aes(x = reorder(SynsetTerms, NetSentiment
   scale_fill_manual(values = c("red", "green"), name = "Sentiment", labels = c("Negative", "Positive"))
 ```
 
-## Conclusion
+### Conclusion  
 
 From the visualization, we can identify the most positive and negative words in our corpus based on their sentiment scores from SentiWordNet.
 
+# Another analysis: MPQA Subjectivity Lexicon
 
-## Another analysis:
-MPQA Subjectivity Lexicon
+### Loading and Parsing the Lexicon:
+Here, we read the MPQA Subjectivity Lexicon file and parse its content into a structured dataframe. We retain relevant columns and rename them for clarity.
 
-```{r}
+```{r, warning = FALSE}
 # Read the file
 subj_lines <- readLines("data/subjclueslen1-HLTEMNLP05.tff")
 
@@ -529,15 +528,17 @@ colnames(subj_clues) <- c("type", "length", "word", "POS", "priorpolarity")
 head(subj_clues)
 ```
 
-## Data Preparation
-match the tokens with the subj_clues lexicon:
+### Data Preparation:
+
+We match the tokenized words from our text with the words in the subjectivity lexicon.
 ```{r}
 matched_tokens2 <- subj_clues %>%
   filter(word %in% tokens)
 ```
 
-## Sentiment Scoring
-We'll assign a simple score: +1 for positive words, -1 for negative words, and 0 for neutral/both.
+### Sentiment Scoring:
+
+Based on the subjectivity lexicon, each word is assigned a sentiment score: +1 for positive words, -1 for negative words, and 0 for neutral or both. The overall sentiment score of the corpus is then computed.
 
 ```{r}
 sentiment_scores <- matched_tokens2 %>%
@@ -550,12 +551,18 @@ sentiment_scores <- matched_tokens2 %>%
 overall_sentiment_score <- sum(sentiment_scores$score)
 ```
 
-## Summary
+### Summary:
+
+A brief summary presenting the overall sentiment score of the corpus.
+
 ```{r}
 paste("The overall sentiment score of the corpus is:", overall_sentiment_score)
 ```
 
-## Visualization
+### Visualization:
+
+A visualization showing the distribution of sentiment in the corpus based on the subjectivity lexicon.
+
 ```{r}
 # Create a sentiment label based on priorpolarity
 matched_tokens2$label <- case_when(
