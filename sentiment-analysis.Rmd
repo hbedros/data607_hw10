@@ -399,7 +399,7 @@ Here, we're loading the text file `"The Young Castellan: A Tale of the English C
 library(tidyverse)
 library(tidytext)
 
-gmf_data <- read_lines("https://raw.githubusercontent.com/hbedros/data607_hw10/main/gmf.txt")
+gmf_data <- read_lines("https://raw.githubusercontent.com/hbedros/data607_hw10/data/gmf.txt")
 
 gmf_data_tibble <- tibble(text = gmf_data)
 
